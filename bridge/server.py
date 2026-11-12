@@ -14,12 +14,14 @@ from pathlib import Path
 from aiohttp import web
 
 import lights
+import presets
 import protocol
 
 HOST = "127.0.0.1"
 PORT = 8765
 WEB_DIRECTORY = Path(__file__).resolve().parent.parent / "web"
 LIGHTS_KEY = web.AppKey("lights", lights.LightsConnection)
+PRESETS_PATH = presets.default_presets_path()
 
 # Action name -> (frame builder, the JSON fields it takes, in the builder's argument order).
 # Adding a control means adding one row here and one function to protocol.py.
@@ -84,6 +86,21 @@ async def show_gradient_colors(request: web.Request) -> web.Response:
     except (ValueError, TypeError, KeyError) as error:
         return json_error(f"bad request: {error}", 400)
     return web.json_response({"colors": colors})
+
+
+async def show_presets(_request: web.Request) -> web.Response:
+    """List the preset slots, slot 1 first; null marks an empty one."""
+    return web.json_response({"slots": presets.load_presets(PRESETS_PATH)})
+
+
+async def store_preset(request: web.Request) -> web.Response:
+    """Save the look in the body to the slot in the path; answer with every slot, like show_presets."""
+    try:
+        slot_number = int(request.match_info["slot"])
+        slots = presets.save_preset(PRESETS_PATH, slot_number, await read_json_body(request))
+    except ValueError as error:  # Also covers a slot that is not a number and malformed JSON.
+        return json_error(f"bad request: {error}", 400)
+    return web.json_response({"slots": slots})
 
 
 async def connect(request: web.Request) -> web.Response:
@@ -154,6 +171,8 @@ def create_app() -> web.Application:
             web.get("/api/options", show_options),
             web.get("/api/status", show_status),
             web.post("/api/gradient-colors", show_gradient_colors),
+            web.get("/api/presets", show_presets),
+            web.put("/api/presets/{slot}", store_preset),
             web.post("/api/connect", connect),
             web.post("/api/disconnect", disconnect),
             web.post("/api/{action}", run_action),

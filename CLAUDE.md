@@ -8,11 +8,14 @@ Follows the global coding standards; this file adds only what is specific to thi
 - `bridge/protocol.py`: pure functions from intent to byte frames. No Bluetooth. Every number was decoded from a Bluetooth
   capture of the MeRGBW app, not from documentation.
 - `bridge/lights.py`: finds, connects to and writes to the lights (bleak/BlueZ). Sends frames, decides nothing.
+- `bridge/presets.py`: six saved looks (panel colors plus brightness) in `~/.config/haxagon-lights/presets.json`. The page
+  applies one by sending it like any other control; the lights store nothing.
 - `bridge/server.py`: aiohttp server on 127.0.0.1:8765. Serves `web/` and a JSON API; one row in `ACTIONS` per control.
 - `web/`: plain HTML/CSS/JS, no build step, typed with JSDoc and `checkJs`. Firefox has no Web Bluetooth, which is why the
   Bluetooth lives in the bridge.
 
-Dependencies point one way: `web` calls `server`, `server` calls `lights` and `protocol`, `lights` calls `protocol`.
+Dependencies point one way: `web` calls `server`, `server` calls `lights`, `presets` and `protocol`, and `lights` and
+`presets` call `protocol`.
 
 ## Commands
 

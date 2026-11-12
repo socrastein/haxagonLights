@@ -11,6 +11,10 @@
   --border: #3a3a4d;
   /* A pointed-top hexagon, the shape of one panel. */
   --hexagon: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  /* The triangle of panels: the bottom row holds 5 panels and 5 rows that overlap by a quarter
+     panel make 4 panel heights. A pointed-top hexagon is sqrt(3) wide for every 2 tall, so
+     width over height is 5 * sqrt(3) / (4 * 2) = 1.0825. */
+  --panel-map-aspect-ratio: 1.0825;
 }
 
 body {
@@ -129,13 +133,11 @@ input[type="color"] {
   border-radius: 0.5rem;
 }
 
-/* The triangle of panels as it hangs on the wall. The bottom row holds 5 panels, so each is a fifth
-   of the width; 5 rows that overlap by a quarter panel make 4 panel heights. A pointed-top
-   hexagon is sqrt(3) wide for every 2 tall, so the ratio is 5 * sqrt(3) / (4 * 2) = 1.0825. */
+/* The triangle of panels as it hangs on the wall; app.js places each panel. */
 #panel-map {
   position: relative;
   max-width: 22rem;
-  aspect-ratio: 1.0825;
+  aspect-ratio: var(--panel-map-aspect-ratio);
   margin: 0 auto;
 }
 
@@ -177,6 +179,50 @@ input[type="color"] {
 /* Selection also shows as a check mark, so it does not rely on the ring's color alone. */
 .panel[aria-pressed="true"] .panel-swatch::after {
   content: "\00a0\2713";
+}
+
+.preset-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.preset-grid li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.preset-apply {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.preset-apply:disabled {
+  color: var(--muted-text);
+  border-color: var(--border);
+  cursor: default;
+}
+
+/* A small copy of the panel map showing what the preset holds. */
+.preset-preview {
+  position: relative;
+  width: 5rem;
+  aspect-ratio: var(--panel-map-aspect-ratio);
+}
+
+.preset-panel {
+  position: absolute;
+  width: 20%;
+  height: 25%;
+  clip-path: var(--hexagon);
+  background: var(--border); /* An empty slot shows the outline of the triangle. */
+  transform: scale(0.9);
 }
 
 .hint {

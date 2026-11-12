@@ -5,6 +5,9 @@
 // Fast enough to feel live, slow enough not to flood Bluetooth.
 const SLIDER_SEND_INTERVAL_MILLISECONDS = 100;
 
+/** @typedef {{ row: number, column: number }} PanelPosition */
+/** @typedef {{ panelColors: string[], brightness: number }} Preset - As bridge/presets.py stores it. */
+
 // Where each panel hangs in the triangle, panel 1 first, following the cable counterclockwise.
 // Row 0 is the tip and row 4 the bottom; a row has one more slot than the one above it, and the
 // column counts slots from that row's left end.
@@ -36,7 +39,7 @@ const panelColors = PANEL_POSITIONS.map(() => PANEL_OFF_COLOR);
 /**
  * Fetch a bridge endpoint and return its JSON body.
  * @param {string} path - e.g. "/api/status".
- * @param {"GET" | "POST"} [method] - Defaults to GET.
+ * @param {"GET" | "POST" | "PUT"} [method] - Defaults to GET.
  * @param {Record<string, unknown>} [body] - Sent as JSON; the bridge insists on the JSON content type.
  * @returns {Promise<any>} The parsed response.
  * @throws {Error} With the bridge's own error message when the response is not OK.
@@ -238,7 +241,7 @@ async function applyGradient() {
 function createPanelMap() {
   const map = element("panel-map");
   PANEL_POSITIONS.forEach((position, index) => {
-    map.appendChild(createPanelButton(index, position.row, position.column));
+    map.appendChild(createPanelButton(index, position));
   });
   showPanelColors();
 }
@@ -246,24 +249,33 @@ function createPanelMap() {
 /**
  * Make the hexagon button for one panel; pressing it selects or deselects the panel.
  * @param {number} index - The panel's place in panelColors (panel number minus one).
- * @param {number} row
- * @param {number} column
+ * @param {PanelPosition} position
  * @returns {HTMLButtonElement}
  */
-function createPanelButton(index, row, column) {
+function createPanelButton(index, position) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "panel";
   button.setAttribute("aria-label", `Panel ${index + 1}`);
   button.setAttribute("aria-pressed", "false");
-  button.style.left = `${panelLeftPercent(row, column)}%`;
-  button.style.top = `${row * ROW_STEP_PERCENT}%`;
+  placePanel(button, position);
   const swatch = document.createElement("span");
   swatch.className = "panel-swatch";
   swatch.textContent = String(index + 1);
   button.appendChild(swatch);
   button.addEventListener("click", () => togglePanel(button, index));
   return button;
+}
+
+/**
+ * Put a panel's shape where the panel hangs, within a map sized like #panel-map.
+ * @param {HTMLElement} panel
+ * @param {PanelPosition} position
+ * @returns {void}
+ */
+function placePanel(panel, { row, column }) {
+  panel.style.left = `${panelLeftPercent(row, column)}%`;
+  panel.style.top = `${row * ROW_STEP_PERCENT}%`;
 }
 
 /**
@@ -373,6 +385,124 @@ function sendPanelColors() {
 }
 
 /**
+ * Fetch the saved presets and show them.
+ * @returns {Promise<void>}
+ */
+async function loadPresets() {
+  const { slots } = await callBridge("/api/presets");
+  showPresets(slots);
+}
+
+/**
+ * Draw one slot per preset, replacing what was there.
+ * @param {(Preset | null)[]} slots - Slot 1 first; null marks an empty slot.
+ * @returns {void}
+ */
+function showPresets(slots) {
+  const slotItems = slots.map((preset, index) => createPresetSlot(index + 1, preset));
+  element("preset-slots").replaceChildren(...slotItems);
+}
+
+/**
+ * Make one slot: the preset's apply button above its Save button.
+ * @param {number} slotNumber - 1 to 6, as shown.
+ * @param {Preset | null} preset
+ * @returns {HTMLLIElement}
+ */
+function createPresetSlot(slotNumber, preset) {
+  const item = document.createElement("li");
+  item.append(
+    createPresetApplyButton(slotNumber, preset),
+    createPresetSaveButton(slotNumber, preset),
+  );
+  return item;
+}
+
+/**
+ * Make the button that shows a preset and applies it; it is disabled while the slot is empty.
+ * @param {number} slotNumber
+ * @param {Preset | null} preset
+ * @returns {HTMLButtonElement}
+ */
+function createPresetApplyButton(slotNumber, preset) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "preset-apply";
+  button.append(createPresetPreview(preset), `Preset ${slotNumber}`);
+  button.disabled = preset === null;
+  if (preset) button.addEventListener("click", () => applyPreset(preset));
+  return button;
+}
+
+/**
+ * Make the button that saves the current look to a slot.
+ * @param {number} slotNumber
+ * @param {Preset | null} preset - What the slot holds now, so replacing it can be confirmed.
+ * @returns {HTMLButtonElement}
+ */
+function createPresetSaveButton(slotNumber, preset) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Save";
+  button.setAttribute("aria-label", `Save to preset ${slotNumber}`);
+  button.addEventListener("click", () => savePreset(slotNumber, preset));
+  return button;
+}
+
+/**
+ * Draw a small copy of the panel map in a preset's colors; an empty slot shows only the outline.
+ * @param {Preset | null} preset
+ * @returns {HTMLSpanElement}
+ */
+function createPresetPreview(preset) {
+  const preview = document.createElement("span");
+  preview.className = "preset-preview";
+  preview.setAttribute("aria-hidden", "true");
+  PANEL_POSITIONS.forEach((position, index) => {
+    const panel = document.createElement("span");
+    panel.className = "preset-panel";
+    placePanel(panel, position);
+    if (preset) panel.style.background = preset.panelColors[index];
+    preview.appendChild(panel);
+  });
+  return preview;
+}
+
+/**
+ * Show a preset's colors and brightness on the page, then send both to the lights.
+ *
+ * Brightness goes second because it applies on top of whatever the panels show.
+ * @param {Preset} preset
+ * @returns {Promise<void>}
+ */
+async function applyPreset(preset) {
+  setPanelColors(preset.panelColors);
+  slider("brightness-slider").value = String(preset.brightness);
+  await sendAction("panels", { colors: panelColors });
+  await sendAction("brightness", { percent: preset.brightness });
+}
+
+/**
+ * Save the panel colors and brightness to a slot, asking first if that replaces a preset.
+ * @param {number} slotNumber
+ * @param {Preset | null} existingPreset - What the slot holds now.
+ * @returns {Promise<void>}
+ */
+async function savePreset(slotNumber, existingPreset) {
+  if (existingPreset && !confirm(`Replace preset ${slotNumber}?`)) return;
+  try {
+    const { slots } = await callBridge(`/api/presets/${slotNumber}`, "PUT", {
+      panelColors,
+      brightness: Number(slider("brightness-slider").value),
+    });
+    showPresets(slots);
+    showStatus(`Saved preset ${slotNumber}`);
+  } catch (error) {
+    showFailure(error);
+  }
+}
+
+/**
  * Show white: zero saturation, with the saturation slider moved to match.
  * @returns {void}
  */
@@ -463,6 +593,7 @@ async function start() {
   const options = await callBridge("/api/options");
   fillButtons("scene-buttons", options.scenes, "scene");
   fillButtons("music-buttons", options.musicModes, "music-mode");
+  await loadPresets();
   updateColorPreview();
   updateGradientPreview();
   const { isConnected } = await callBridge("/api/status");

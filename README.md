@@ -9,6 +9,8 @@ This is an unofficial project, not affiliated with the lights' maker. It has bee
 
 - Power, solid color (hue and saturation), and brightness
 - A gradient from one color to another along the panels
+- Each panel's own color, picked on a map of the panels as they hang
+- Six presets that save the panel colors and brightness
 - The 18 built-in scenes, with a speed slider
 - The 6 music modes, with a sensitivity slider
 - Connects to the lights automatically when the page opens
