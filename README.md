@@ -40,8 +40,7 @@ On a Linux desktop, `launcher/haxagon-lights.sh` starts the bridge if needed and
 
 - The lights accept **one Bluetooth connection at a time**. Close or disconnect any phone app first, or the page will not
   find them.
-- Only panels 1 to 11 can be colored separately. The top panel of the triangle always copies panel 2. No variation of the
-  command changed that.
+- The panels form one chain from the cable. Don't plug the last panel back into the first: it then copies panel 2.
 - LEDs wash out pale colors, so a gradient looks closer to the screen if both colors are a bit darker than you expect.
 - Another set of Haxagon lights may use different panel counts or commands. The protocol notes should help if it does.
 

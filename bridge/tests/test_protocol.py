@@ -164,10 +164,10 @@ class TestPerLightColors:
         assert protocol.per_light_frame([(1, 2, 3)])[-1] == 0x63
         assert protocol.per_light_frame([(9, 9, 9)])[-1] == 0x63
 
-    def test_accepts_exactly_eleven_panels(self) -> None:
-        protocol.per_light_frame([(0, 0, 0)] * 11)
+    def test_accepts_up_to_the_table_size_of_20(self) -> None:
+        protocol.per_light_frame([(0, 0, 0)] * 20)
         with pytest.raises(ValueError):
-            protocol.per_light_frame([(0, 0, 0)] * 12)
+            protocol.per_light_frame([(0, 0, 0)] * 21)
 
     def test_rejects_no_panels(self) -> None:
         with pytest.raises(ValueError):
@@ -193,19 +193,20 @@ class TestGradient:
     def test_first_panel_is_the_start_color(self) -> None:
         assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[0] == (255, 149, 255)
 
-    def test_eleventh_panel_is_the_end_color(self) -> None:
-        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[10] == (91, 206, 250)
+    def test_twelfth_panel_the_tip_is_the_end_color(self) -> None:
+        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[11] == (91, 206, 250)
 
-    def test_sixth_panel_is_halfway(self) -> None:
-        halfway = self.table_of(protocol.gradient_frame("#000000", "#640064"))[5]
-        assert halfway == (50, 0, 50)
+    def test_panels_are_evenly_spaced_in_eleven_steps(self) -> None:
+        # 12 panels make 11 steps, so a channel going 0 to 110 rises by 10 per panel.
+        fourth = self.table_of(protocol.gradient_frame("#000000", "#6e006e"))[3]
+        assert fourth == (30, 0, 30)
 
-    def test_unused_entries_stay_dark(self) -> None:
-        unused = self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[11:]
-        assert unused == [(0, 0, 0)] * 9
+    def test_entries_past_the_last_panel_stay_dark(self) -> None:
+        unused = self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[12:]
+        assert unused == [(0, 0, 0)] * 8
 
     def test_a_single_color_gradient_is_flat(self) -> None:
-        panels = self.table_of(protocol.gradient_frame(self.PINK, self.PINK))[:11]
+        panels = self.table_of(protocol.gradient_frame(self.PINK, self.PINK))[:12]
         assert set(panels) == {(255, 149, 255)}
 
     @pytest.mark.parametrize("bad", ["ff95ff", "#ff95f", "#ff95ffff", "#gg95ff", "pink", ""])

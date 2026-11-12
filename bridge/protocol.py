@@ -44,12 +44,13 @@ PERCENT_TO_WIRE_SCALE = WIRE_SCALE_MAXIMUM // MAXIMUM_PERCENT
 # How many leading bytes of the lights' Bluetooth advertisement identify them in the handshake.
 HANDSHAKE_IDENTITY_LENGTH = 6
 
-# The per-light ("DIY") command carries a table of 20 RGB entries, in the order of the snake the
-# app draws. Only entries 1-11 light panels 1-11; entry 2 also lights panel 12, the tip, which
-# has no entry of its own (found by experiment: no variation of the frame changed that).
-# Entries 12-20 do nothing, but the lights ignore a frame unless it has all 20.
+# The per-light ("DIY") command carries a table of 20 RGB entries. The panels are one chain of
+# addressable LEDs, so entry N lights the Nth panel along the chain from the cable. Entries past
+# the last panel do nothing, but the lights ignore a frame unless it has all 20.
+# A panel plugged into two neighbors gets the same data twice: with the last panel also plugged
+# into the first, it copied panel 2 until that connector was removed.
 PER_LIGHT_TABLE_ENTRIES = 20
-PANELS_WITH_OWN_ENTRY = 11
+PANEL_COUNT = 12  # The one set this was tried on.
 PER_LIGHT_MODE_FLAG = 0x01  # First payload byte in every capture; 0x00 and 0x02 were ignored.
 # This command ends in a constant instead of a checksum. Every capture had 0x63; the lights
 # accepted 0x00 as well, so it is probably not checked. We send what the app sends.
@@ -187,12 +188,11 @@ def state_query_frame() -> bytes:
 def per_light_frame(panel_colors: list[Rgb]) -> bytes:
     """Color each panel separately: one (red, green, blue) per panel, in snake order.
 
-    Give colors for panels 1 to 11; the rest of the table is filled with black. The tip (panel
-    12) cannot be set: it always copies panel 2. Captured example: red, yellow, blue then
-    nothing is 55 04 ff 42 01 ff0000 ffff00 0000ff 00... 63.
+    Give 1 to 20 colors, the table's size; the rest of the table is filled with black. Captured
+    example: red, yellow, blue then nothing is 55 04 ff 42 01 ff0000 ffff00 0000ff 00... 63.
     """
-    if not 1 <= len(panel_colors) <= PANELS_WITH_OWN_ENTRY:
-        raise ValueError(f"give 1 to {PANELS_WITH_OWN_ENTRY} panel colors")
+    if not 1 <= len(panel_colors) <= PER_LIGHT_TABLE_ENTRIES:
+        raise ValueError(f"give 1 to {PER_LIGHT_TABLE_ENTRIES} panel colors")
     unused_entries = [BLACK] * (PER_LIGHT_TABLE_ENTRIES - len(panel_colors))
     table = b"".join(color_bytes(color) for color in panel_colors + unused_entries)
     frame = build_frame(COMMAND_PER_LIGHT_COLORS, bytes([PER_LIGHT_MODE_FLAG]) + table)
@@ -200,13 +200,13 @@ def per_light_frame(panel_colors: list[Rgb]) -> bytes:
 
 
 def gradient_frame(start_color: str, end_color: str) -> bytes:
-    """Fade along the snake from the start color on panel 1 to the end color on panel 11.
+    """Fade along the chain from the start color on panel 1 to the end color on the last panel.
 
-    Colors are hex like "#ff95ff". The tip copies panel 2, so it shows nearly the start color.
+    Colors are hex like "#ff95ff".
     """
     start = parse_hex_color(start_color)
     end = parse_hex_color(end_color)
-    return per_light_frame(blend_colors(start, end, PANELS_WITH_OWN_ENTRY))
+    return per_light_frame(blend_colors(start, end, PANEL_COUNT))
 
 
 def blend_colors(start: Rgb, end: Rgb, steps: int) -> list[Rgb]:

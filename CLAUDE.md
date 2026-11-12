@@ -30,9 +30,10 @@ Dependencies point one way: `web` calls `server`, `server` calls `lights` and `p
 - Commands go to characteristic `0xfff3`; replies arrive on `0xfff4` after writing `01 00` to its descriptor.
 - Frame: `55 CMD ff LEN payload CHECKSUM`; checksum is the complement of the byte sum. The per-light "DIY" command (`04`)
   is the exception: it ends in a constant (`0x63` in every capture) that the lights do not check (`0x00` also worked).
-- 12 panels in a ring (a triangle). The cable enters at panel 1, then counterclockwise, ending at the top tip.
-- A per-light frame holds 20 RGB entries in snake order, but only entries 1-11 light panels 1-11; entry 2 also lights panel
-  12 (the tip), which has no entry of its own. Entries 12-20 do nothing.
+- 12 panels in an open ring (a triangle). The cable enters at panel 1, then counterclockwise, ending at the top tip.
+- The panels are one chain of addressable LEDs: entry N of a per-light frame's 20 lights the Nth panel from the cable, and
+  entries past the last panel do nothing. A panel plugged into two neighbors gets the same data twice, so the ring must stay
+  open: the tip once copied panel 2 because it was also plugged into panel 1.
 - The lights **ignore** a per-light frame unless it has all 20 entries and the leading byte is `01` (`00` and `02` were
   acknowledged but ignored, as were 11- and 12-entry tables). They acknowledge everything, so an ack proves nothing.
 - Brightness (`05`) still works on top of a per-light frame.
@@ -43,7 +44,6 @@ Dependencies point one way: `web` calls `server`, `server` calls `lights` and `p
 - Whether commands need the handshake and clock sync the app sends after connecting (the bridge sends both).
 - The real minimum brightness (the app's lowest captured value was 0x00be, 19%).
 - The default music sensitivity on the wire (the capture never showed the app's 75%).
-- Whether the app has a setting that stops the tip mirroring panel 2 (no frame variation we tried did).
 - Why a power-on frame sometimes gets no `56 01` reply.
 
 ## Capturing more of the app's protocol
