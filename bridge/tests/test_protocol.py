@@ -143,3 +143,87 @@ class TestConnectionSetup:
         wednesday = datetime(2026, 11, 11, 15, 48, 6)
         captured = frame("55 0c ff 0d 07 ea 0b 0b 0f 30 06 03 43")
         assert protocol.clock_sync_frame(wednesday) == captured
+
+
+class TestPerLightColors:
+    """The 20-entry color table from the app's DIY screen, in snake order."""
+
+    def test_panel_one_white_matches_the_first_capture(self) -> None:
+        expected = frame("55 04 ff 42 01 ff ff ff") + bytes(57) + b"\x63"
+        assert protocol.per_light_frame([(255, 255, 255)]) == expected
+
+    def test_red_yellow_blue_matches_the_capture(self) -> None:
+        expected = frame("55 04 ff 42 01 ff 00 00 ff ff 00 00 00 ff") + bytes(51) + b"\x63"
+        panels = [(255, 0, 0), (255, 255, 0), (0, 0, 255)]
+        assert protocol.per_light_frame(panels) == expected
+
+    def test_always_sends_all_20_entries_because_shorter_frames_are_ignored(self) -> None:
+        assert len(protocol.per_light_frame([(1, 2, 3)])) == 66
+
+    def test_ends_with_the_constant_the_app_sends_not_a_checksum(self) -> None:
+        assert protocol.per_light_frame([(1, 2, 3)])[-1] == 0x63
+        assert protocol.per_light_frame([(9, 9, 9)])[-1] == 0x63
+
+    def test_accepts_exactly_eleven_panels(self) -> None:
+        protocol.per_light_frame([(0, 0, 0)] * 11)
+        with pytest.raises(ValueError):
+            protocol.per_light_frame([(0, 0, 0)] * 12)
+
+    def test_rejects_no_panels(self) -> None:
+        with pytest.raises(ValueError):
+            protocol.per_light_frame([])
+
+    def test_channel_bound_is_255(self) -> None:
+        protocol.per_light_frame([(255, 255, 255)])
+        with pytest.raises(ValueError):
+            protocol.per_light_frame([(256, 0, 0)])
+
+
+class TestGradient:
+    """A fade along the snake from the start color to the end color."""
+
+    PINK = "#ff95ff"
+    BLUE = "#5bcefa"
+
+    def table_of(self, gradient: bytes) -> list[tuple[int, int, int]]:
+        """Read a frame's 20 table entries back as colors."""
+        table = gradient[5:65]
+        return [tuple(table[i : i + 3]) for i in range(0, 60, 3)]  # type: ignore[misc]
+
+    def test_first_panel_is_the_start_color(self) -> None:
+        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[0] == (255, 149, 255)
+
+    def test_eleventh_panel_is_the_end_color(self) -> None:
+        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[10] == (91, 206, 250)
+
+    def test_sixth_panel_is_halfway(self) -> None:
+        halfway = self.table_of(protocol.gradient_frame("#000000", "#640064"))[5]
+        assert halfway == (50, 0, 50)
+
+    def test_unused_entries_stay_dark(self) -> None:
+        unused = self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[11:]
+        assert unused == [(0, 0, 0)] * 9
+
+    def test_a_single_color_gradient_is_flat(self) -> None:
+        panels = self.table_of(protocol.gradient_frame(self.PINK, self.PINK))[:11]
+        assert set(panels) == {(255, 149, 255)}
+
+    @pytest.mark.parametrize("bad", ["ff95ff", "#ff95f", "#ff95ffff", "#gg95ff", "pink", ""])
+    def test_rejects_colors_that_are_not_hash_rrggbb(self, bad: str) -> None:
+        with pytest.raises(ValueError):
+            protocol.gradient_frame(bad, self.BLUE)
+
+    def test_rejects_a_color_that_is_not_text(self) -> None:
+        with pytest.raises(ValueError):
+            protocol.gradient_frame(123456, self.BLUE)  # type: ignore[arg-type]
+
+
+class TestBlending:
+    """Mixing two colors in RGB."""
+
+    def test_needs_at_least_two_steps(self) -> None:
+        with pytest.raises(ValueError):
+            protocol.blend_colors((0, 0, 0), (255, 255, 255), 1)
+
+    def test_two_steps_are_just_the_ends(self) -> None:
+        assert protocol.blend_colors((1, 2, 3), (4, 5, 6), 2) == [(1, 2, 3), (4, 5, 6)]

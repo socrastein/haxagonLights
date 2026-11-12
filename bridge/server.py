@@ -27,6 +27,7 @@ ACTIONS: dict[str, tuple[Callable[..., bytes], list[str]]] = {
     "power": (protocol.power_frame, ["isOn"]),
     "color": (protocol.color_frame, ["hue", "saturation"]),
     "brightness": (protocol.brightness_frame, ["percent"]),
+    "gradient": (protocol.gradient_frame, ["startColor", "endColor"]),
     "scene": (protocol.scene_frame, ["name"]),
     "scene-speed": (protocol.scene_speed_frame, ["percent"]),
     "music-mode": (protocol.music_mode_frame, ["name"]),

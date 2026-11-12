@@ -9,10 +9,13 @@ A frame is: 0x55, command, 0xFF, total length, payload bytes..., checksum.
 
 from datetime import datetime
 
+Rgb = tuple[int, int, int]  # Red, green, blue, each 0-255.
+
 FRAME_START = 0x55
 FRAME_ADDRESS = 0xFF  # Always 0xFF in every captured frame.
 FRAME_OVERHEAD_BYTES = 5  # Start, command, address, length and checksum around the payload.
 BYTE_MASK = 0xFF
+BYTE_MAXIMUM = 255  # Largest value one color channel can hold.
 
 COMMAND_STATE_QUERY = 0x00
 COMMAND_POWER = 0x01
@@ -24,6 +27,7 @@ COMMAND_MUSIC_SENSITIVITY = 0x08
 COMMAND_CLOCK_SYNC = 0x0C
 COMMAND_HANDSHAKE = 0x0E
 COMMAND_SCENE_SPEED = 0x0F
+COMMAND_PER_LIGHT_COLORS = 0x04
 
 # The lights report hue in degrees and saturation and brightness on a 0-1000 scale.
 MAXIMUM_HUE_DEGREES = 360
@@ -32,10 +36,24 @@ MAXIMUM_PERCENT = 100
 # Whole numbers a caller may pass, as ranges (a range's end is exclusive, hence the + 1).
 ALLOWED_HUE_DEGREES = range(0, MAXIMUM_HUE_DEGREES + 1)
 ALLOWED_PERCENTS = range(0, MAXIMUM_PERCENT + 1)
+ALLOWED_CHANNEL_VALUES = range(0, BYTE_MAXIMUM + 1)
+BLACK: Rgb = (0, 0, 0)
+HEX_COLOR_LENGTH = len("#rrggbb")
 PERCENT_TO_WIRE_SCALE = WIRE_SCALE_MAXIMUM // MAXIMUM_PERCENT
 
 # How many leading bytes of the lights' Bluetooth advertisement identify them in the handshake.
 HANDSHAKE_IDENTITY_LENGTH = 6
+
+# The per-light ("DIY") command carries a table of 20 RGB entries, in the order of the snake the
+# app draws. Only entries 1-11 light panels 1-11; entry 2 also lights panel 12, the tip, which
+# has no entry of its own (found by experiment: no variation of the frame changed that).
+# Entries 12-20 do nothing, but the lights ignore a frame unless it has all 20.
+PER_LIGHT_TABLE_ENTRIES = 20
+PANELS_WITH_OWN_ENTRY = 11
+PER_LIGHT_MODE_FLAG = 0x01  # First payload byte in every capture; 0x00 and 0x02 were ignored.
+# This command ends in a constant instead of a checksum. Every capture had 0x63; the lights
+# accepted 0x00 as well, so it is probably not checked. We send what the app sends.
+PER_LIGHT_TRAILER = 0x63
 
 # Scene name to the ID the app sends, in the order the app lists them.
 SCENE_IDS = {
@@ -164,6 +182,73 @@ def clock_sync_frame(now: datetime) -> bytes:
 def state_query_frame() -> bytes:
     """Ask the lights for their state; they answer with a 56 00 ff 14 ... notification."""
     return build_frame(COMMAND_STATE_QUERY, b"")
+
+
+def per_light_frame(panel_colors: list[Rgb]) -> bytes:
+    """Color each panel separately: one (red, green, blue) per panel, in snake order.
+
+    Give colors for panels 1 to 11; the rest of the table is filled with black. The tip (panel
+    12) cannot be set: it always copies panel 2. Captured example: red, yellow, blue then
+    nothing is 55 04 ff 42 01 ff0000 ffff00 0000ff 00... 63.
+    """
+    if not 1 <= len(panel_colors) <= PANELS_WITH_OWN_ENTRY:
+        raise ValueError(f"give 1 to {PANELS_WITH_OWN_ENTRY} panel colors")
+    unused_entries = [BLACK] * (PER_LIGHT_TABLE_ENTRIES - len(panel_colors))
+    table = b"".join(color_bytes(color) for color in panel_colors + unused_entries)
+    frame = build_frame(COMMAND_PER_LIGHT_COLORS, bytes([PER_LIGHT_MODE_FLAG]) + table)
+    return frame[:-1] + bytes([PER_LIGHT_TRAILER])  # Replace the checksum: see PER_LIGHT_TRAILER.
+
+
+def gradient_frame(start_color: str, end_color: str) -> bytes:
+    """Fade along the snake from the start color on panel 1 to the end color on panel 11.
+
+    Colors are hex like "#ff95ff". The tip copies panel 2, so it shows nearly the start color.
+    """
+    start = parse_hex_color(start_color)
+    end = parse_hex_color(end_color)
+    return per_light_frame(blend_colors(start, end, PANELS_WITH_OWN_ENTRY))
+
+
+def blend_colors(start: Rgb, end: Rgb, steps: int) -> list[Rgb]:
+    """Return steps colors from start to end inclusive, evenly spaced in RGB.
+
+    RGB mixing matches how a CSS linear-gradient between two colors looks on screen.
+    """
+    if steps < 2:
+        raise ValueError("a blend needs at least 2 steps")
+    last_step = steps - 1
+    return [blend_color(start, end, step / last_step) for step in range(steps)]
+
+
+def blend_color(start: Rgb, end: Rgb, fraction: float) -> Rgb:
+    """Mix two colors: fraction 0 is the start, 1 is the end, 0.5 is halfway."""
+    (start_red, start_green, start_blue), (end_red, end_green, end_blue) = start, end
+    return (
+        mix_channel(start_red, end_red, fraction),
+        mix_channel(start_green, end_green, fraction),
+        mix_channel(start_blue, end_blue, fraction),
+    )
+
+
+def mix_channel(start: int, end: int, fraction: float) -> int:
+    """Move from start toward end by the fraction, rounded to a whole channel value."""
+    return round(start + (end - start) * fraction)
+
+
+def parse_hex_color(hex_color: str) -> Rgb:
+    """Read "#rrggbb" (what a browser color picker gives) as (red, green, blue), each 0-255."""
+    is_well_formed = isinstance(hex_color, str) and len(hex_color) == HEX_COLOR_LENGTH
+    if not is_well_formed or not hex_color.startswith("#"):
+        raise ValueError(f"color must look like #rrggbb, not {hex_color!r}")
+    channels = bytes.fromhex(hex_color[1:])  # Raises ValueError itself on non-hex digits.
+    return channels[0], channels[1], channels[2]
+
+
+def color_bytes(color: Rgb) -> bytes:
+    """Encode one (red, green, blue) as three bytes, refusing channels outside 0-255."""
+    for channel in color:
+        require_within(channel, ALLOWED_CHANNEL_VALUES, "color channel")
+    return bytes(color)
 
 
 def require_within(value: int, allowed: range, label: str) -> None:

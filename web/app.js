@@ -155,6 +155,28 @@ function sendColor() {
 }
 
 /**
+ * Update the preview bar to show the fade between the two picked colors.
+ * @returns {void}
+ */
+function updateGradientPreview() {
+  const startColor = slider("gradient-start").value;
+  const endColor = slider("gradient-end").value;
+  element("gradient-preview").style.background =
+    `linear-gradient(to right, ${startColor}, ${endColor})`;
+}
+
+/**
+ * Send the two picked colors as a gradient along the panels.
+ * @returns {void}
+ */
+function sendGradient() {
+  sendAction("gradient", {
+    startColor: slider("gradient-start").value,
+    endColor: slider("gradient-end").value,
+  });
+}
+
+/**
  * Show white: zero saturation, with the saturation slider moved to match.
  * @returns {void}
  */
@@ -200,25 +222,37 @@ function fillButtons(containerId, names, action) {
 }
 
 /**
- * Wire every control, load the scene and music names, and show the current connection.
- * @returns {Promise<void>}
+ * Make every fixed control in index.html do its job (the scene and music buttons are made later,
+ * once the bridge has said what they are).
+ * @returns {void}
  */
-async function start() {
+function connectControls() {
   element("connect-button").addEventListener("click", toggleConnection);
   element("power-on-button").addEventListener("click", () => sendAction("power", { isOn: true }));
   element("power-off-button").addEventListener("click", () => sendAction("power", { isOn: false }));
   element("white-button").addEventListener("click", sendWhite);
+  element("gradient-button").addEventListener("click", sendGradient);
+  slider("gradient-start").addEventListener("input", updateGradientPreview);
+  slider("gradient-end").addEventListener("input", updateGradientPreview);
   const sendColorWhileDragging = throttled(sendColor);
   slider("hue-slider").addEventListener("input", sendColorWhileDragging);
   slider("saturation-slider").addEventListener("input", sendColorWhileDragging);
   connectSlider("brightness-slider", "brightness");
   connectSlider("scene-speed-slider", "scene-speed");
   connectSlider("music-sensitivity-slider", "music-sensitivity");
+}
 
+/**
+ * Wire every control, load the scene and music names, and show the current connection.
+ * @returns {Promise<void>}
+ */
+async function start() {
+  connectControls();
   const options = await callBridge("/api/options");
   fillButtons("scene-buttons", options.scenes, "scene");
   fillButtons("music-buttons", options.musicModes, "music-mode");
   updateColorPreview();
+  updateGradientPreview();
   showConnection((await callBridge("/api/status")).isConnected);
 }
 
