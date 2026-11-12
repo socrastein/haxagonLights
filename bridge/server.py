@@ -94,7 +94,7 @@ async def show_presets(_request: web.Request) -> web.Response:
 
 
 async def store_preset(request: web.Request) -> web.Response:
-    """Save the look in the body to the slot in the path; answer with every slot, like show_presets."""
+    """Save the body's look to the slot in the path; answer with every slot, like show_presets."""
     try:
         slot_number = int(request.match_info["slot"])
         slots = presets.save_preset(PRESETS_PATH, slot_number, await read_json_body(request))
