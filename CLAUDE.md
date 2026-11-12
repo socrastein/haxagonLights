@@ -51,3 +51,19 @@ Dependencies point one way: `web` calls `server`, `server` calls `lights` and `p
 Enable "Enable Bluetooth HCI snoop log" in Android Developer options, use the app, then `adb bugreport` and read
 `FS/data/misc/bluetooth/logs/btsnoop_hci.log` (btsnoop format, H4 packets, ATT on L2CAP channel 4). Delete the bug report
 afterwards: it holds a lot of the phone's data.
+
+## Taskbar launcher
+
+`launcher/haxagon-lights.sh` starts the bridge if nothing answers on port 8765 (detached, logging to
+`~/.cache/haxagon-lights.log`), then opens the page in a new Firefox window. `launcher/haxagon-lights.svg` is its icon: a
+flat-topped hexagon in the website's dark-theme hero gradient.
+
+On mattPC the XFCE panel (`xfce4-panel`, settings in xfconf channel `xfce4-panel`) has it as plugin 34 in panel 1, between
+the Webcam Zoom and Mouse Settings launchers. The panel's launcher reads `~/.config/xfce4/panel/launcher-34/haxagon-lights.desktop`
+(it points at this script and icon by absolute path). To recreate it: write that file, then
+`xfconf-query -c xfce4-panel -n -p /plugins/plugin-34 -t string -s launcher`, set `/plugins/plugin-34/items` to
+`haxagon-lights.desktop` (an array), insert 34 into `/panels/panel-1/plugin-ids`, and run `xfce4-panel -r`. The panel config
+before this change is kept beside the live one as `xfce4-panel.xml.before-haxagon`.
+
+The bridge keeps running after the page closes, and holds the lights only while connected. Stop it with
+`kill $(pgrep -f 'bridge/server.py')`, run from a shell whose own command line does not contain that text.

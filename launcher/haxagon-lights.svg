@@ -1,0 +1,18 @@
+<!-- Taskbar icon: a flat-topped hexagon, like the panels, filled with the website's hero gradient
+     (dark theme: the accent pink to the hero blue, left to right). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff95ff" />
+      <stop offset="1" stop-color="#5bcefa" />
+    </linearGradient>
+  </defs>
+  <!-- The stroke repeats the fill so the corners come out rounded. -->
+  <polygon
+    points="58,32 45,54.5 19,54.5 6,32 19,9.5 45,9.5"
+    fill="url(#hero)"
+    stroke="url(#hero)"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+</svg>
