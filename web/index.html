@@ -1,0 +1,61 @@
+<!doctype html>
+<!-- The control page for the Haxagon lights. app.js fills in the scene and music buttons and talks
+     to the local bridge (bridge/server.py); style.css holds the look. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Haxagon Lights</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Haxagon Lights</h1>
+
+      <section aria-labelledby="connection-heading">
+        <h2 id="connection-heading">Connection</h2>
+        <button id="connect-button" type="button">Connect</button>
+        <p id="status" role="status">Not connected</p>
+      </section>
+
+      <fieldset id="controls" disabled>
+        <section aria-labelledby="power-heading">
+          <h2 id="power-heading">Power</h2>
+          <button id="power-on-button" type="button">On</button>
+          <button id="power-off-button" type="button">Off</button>
+        </section>
+
+        <section aria-labelledby="color-heading">
+          <h2 id="color-heading">Color</h2>
+          <div id="color-preview" aria-hidden="true"></div>
+          <label for="hue-slider">Hue</label>
+          <input id="hue-slider" class="hue-track" type="range" min="0" max="360" value="0" />
+          <label for="saturation-slider">Saturation</label>
+          <input id="saturation-slider" type="range" min="0" max="100" value="100" />
+          <button id="white-button" type="button">White</button>
+        </section>
+
+        <section aria-labelledby="brightness-heading">
+          <h2 id="brightness-heading">Brightness</h2>
+          <label for="brightness-slider">Brightness</label>
+          <input id="brightness-slider" type="range" min="0" max="100" value="100" />
+        </section>
+
+        <section aria-labelledby="scenes-heading">
+          <h2 id="scenes-heading">Scenes</h2>
+          <div id="scene-buttons" class="button-grid"></div>
+          <label for="scene-speed-slider">Speed</label>
+          <input id="scene-speed-slider" type="range" min="0" max="100" value="50" />
+        </section>
+
+        <section aria-labelledby="music-heading">
+          <h2 id="music-heading">Music</h2>
+          <div id="music-buttons" class="button-grid"></div>
+          <label for="music-sensitivity-slider">Sensitivity</label>
+          <input id="music-sensitivity-slider" type="range" min="0" max="100" value="75" />
+        </section>
+      </fieldset>
+    </main>
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

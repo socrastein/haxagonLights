@@ -1,0 +1,112 @@
+/* The look of the control page: a dark theme through color tokens, one column, large touch targets. */
+
+:root {
+  --background: #14141a;
+  --surface: #1f1f29;
+  --text: #ecebf4;
+  --muted-text: #a9a8bd;
+  --accent: #7c6cff;
+  --accent-text: #ffffff;
+  --error: #ff8a8a;
+  --border: #3a3a4d;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+main {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  color: var(--muted-text);
+  margin: 0 0 0.5rem;
+}
+
+section {
+  background: var(--surface);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+fieldset:disabled {
+  opacity: 0.4;
+}
+
+label {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 2rem;
+}
+
+/* Matches the lights' hue scale: red at 0, green at 120, blue at 240, back to red at 360. */
+.hue-track {
+  appearance: none;
+  border-radius: 1rem;
+  background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);
+}
+
+button {
+  background: var(--background);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
+
+#color-preview {
+  height: 3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+#status.is-error {
+  color: var(--error);
+}

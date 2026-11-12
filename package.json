@@ -1,0 +1,19 @@
+{
+  "name": "haxagon-lights",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local web page and Bluetooth bridge that control Haxagon lights without the vendor app.",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": ".venv/bin/python -m pytest -q",
+    "measure": "node ~/repos/codingStandards/measure/measure.js",
+    "start": ".venv/bin/python bridge/server.py"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3"
+  }
+}
