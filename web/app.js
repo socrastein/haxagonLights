@@ -112,20 +112,39 @@ function showConnection(isConnected) {
 
 /**
  * Connect if disconnected and disconnect if connected, as the bridge currently sees it.
- *
- * Connecting scans for up to 10 seconds. It fails when something else, such as the phone app,
- * already holds the lights, because they accept one connection at a time.
  * @returns {Promise<void>}
  */
 async function toggleConnection() {
   try {
     const { isConnected } = await callBridge("/api/status");
-    if (!isConnected) showStatus("Looking for the lights (the phone app must be disconnected)...");
-    const status = await callBridge(isConnected ? "/api/disconnect" : "/api/connect", "POST");
-    showConnection(status.isConnected);
+    if (isConnected) await disconnectFromLights();
+    else await connectToLights();
   } catch (error) {
     showFailure(error);
   }
+}
+
+/**
+ * Ask the bridge to find and connect to the lights, then enable the controls.
+ *
+ * The scan takes up to 10 seconds. It fails when something else, such as a phone app, already
+ * holds the lights, because they accept one connection at a time.
+ * @returns {Promise<void>}
+ * @throws {Error} With the bridge's message when the lights cannot be found.
+ */
+async function connectToLights() {
+  showStatus("Looking for the lights...");
+  const status = await callBridge("/api/connect", "POST");
+  showConnection(status.isConnected);
+}
+
+/**
+ * Ask the bridge to release the lights, then disable the controls.
+ * @returns {Promise<void>}
+ */
+async function disconnectFromLights() {
+  const status = await callBridge("/api/disconnect", "POST");
+  showConnection(status.isConnected);
 }
 
 /**
@@ -243,7 +262,7 @@ function connectControls() {
 }
 
 /**
- * Wire every control, load the scene and music names, and show the current connection.
+ * Wire every control, load the scene and music names, and connect to the lights if needed.
  * @returns {Promise<void>}
  */
 async function start() {
@@ -253,7 +272,12 @@ async function start() {
   fillButtons("music-buttons", options.musicModes, "music-mode");
   updateColorPreview();
   updateGradientPreview();
-  showConnection((await callBridge("/api/status")).isConnected);
+  const { isConnected } = await callBridge("/api/status");
+  showConnection(isConnected);
+  // Opening the page means wanting the lights, so connect without a click. A failure is shown in the
+  // status line and the Connect button retries; it is not a bridge failure, so it must not reach
+  // the "cannot reach the bridge" handler below.
+  if (!isConnected) await connectToLights().catch(showFailure);
 }
 
 start().catch((error) => showStatus(`Cannot reach the bridge: ${error.message}`, true));
