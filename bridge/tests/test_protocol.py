@@ -207,38 +207,35 @@ class TestGradient:
     PINK = "#ff95ff"
     BLUE = "#5bcefa"
 
-    def table_of(self, gradient: bytes) -> list[tuple[int, int, int]]:
-        """Read a frame's 20 table entries back as colors."""
-        table = gradient[5:65]
-        return [tuple(table[i : i + 3]) for i in range(0, 60, 3)]  # type: ignore[misc]
+    def test_gives_one_color_per_panel(self) -> None:
+        assert len(protocol.gradient_colors(self.PINK, self.BLUE)) == 12
 
     def test_first_panel_is_the_start_color(self) -> None:
-        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[0] == (255, 149, 255)
+        assert protocol.gradient_colors(self.PINK, self.BLUE)[0] == self.PINK
 
     def test_twelfth_panel_the_tip_is_the_end_color(self) -> None:
-        assert self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[11] == (91, 206, 250)
+        assert protocol.gradient_colors(self.PINK, self.BLUE)[11] == self.BLUE
 
     def test_panels_are_evenly_spaced_in_eleven_steps(self) -> None:
-        # 12 panels make 11 steps, so a channel going 0 to 110 rises by 10 per panel.
-        fourth = self.table_of(protocol.gradient_frame("#000000", "#6e006e"))[3]
-        assert fourth == (30, 0, 30)
-
-    def test_entries_past_the_last_panel_stay_dark(self) -> None:
-        unused = self.table_of(protocol.gradient_frame(self.PINK, self.BLUE))[12:]
-        assert unused == [(0, 0, 0)] * 8
+        # 12 panels make 11 steps, so a channel going 0 to 110 (0x6e) rises by 10 per panel.
+        fourth = protocol.gradient_colors("#000000", "#6e006e")[3]
+        assert fourth == "#1e001e"
 
     def test_a_single_color_gradient_is_flat(self) -> None:
-        panels = self.table_of(protocol.gradient_frame(self.PINK, self.PINK))[:12]
-        assert set(panels) == {(255, 149, 255)}
+        assert set(protocol.gradient_colors(self.PINK, self.PINK)) == {self.PINK}
+
+    def test_colors_come_back_in_the_form_the_page_sends(self) -> None:
+        colors = protocol.gradient_colors(self.PINK, self.BLUE)
+        protocol.panel_colors_frame(colors)  # Raises if any color is not "#rrggbb".
 
     @pytest.mark.parametrize("bad", ["ff95ff", "#ff95f", "#ff95ffff", "#gg95ff", "pink", ""])
     def test_rejects_colors_that_are_not_hash_rrggbb(self, bad: str) -> None:
         with pytest.raises(ValueError):
-            protocol.gradient_frame(bad, self.BLUE)
+            protocol.gradient_colors(bad, self.BLUE)
 
     def test_rejects_a_color_that_is_not_text(self) -> None:
         with pytest.raises(ValueError):
-            protocol.gradient_frame(123456, self.BLUE)  # type: ignore[arg-type]
+            protocol.gradient_colors(123456, self.BLUE)  # type: ignore[arg-type]
 
 
 class TestBlending:

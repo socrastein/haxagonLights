@@ -213,14 +213,22 @@ function updateGradientPreview() {
 }
 
 /**
- * Send the two picked colors as a gradient along the panels.
- * @returns {void}
+ * Fill the panel map with a gradient between the two picked colors, then send it.
+ *
+ * The bridge works out the colors so the blending lives in one tested place (protocol.py).
+ * @returns {Promise<void>}
  */
-function sendGradient() {
-  sendAction("gradient", {
-    startColor: slider("gradient-start").value,
-    endColor: slider("gradient-end").value,
-  });
+async function applyGradient() {
+  try {
+    const { colors } = await callBridge("/api/gradient-colors", "POST", {
+      startColor: slider("gradient-start").value,
+      endColor: slider("gradient-end").value,
+    });
+    setPanelColors(colors);
+    sendPanelColors();
+  } catch (error) {
+    showFailure(error);
+  }
 }
 
 /**
@@ -335,6 +343,17 @@ function isPressed(button) {
 }
 
 /**
+ * Replace every panel's color and show the new ones. The array is changed in place because the
+ * rest of the page holds on to it.
+ * @param {string[]} colors - "#rrggbb", panel 1 first, one per panel.
+ * @returns {void}
+ */
+function setPanelColors(colors) {
+  panelColors.splice(0, panelColors.length, ...colors);
+  showPanelColors();
+}
+
+/**
  * Fill each panel's hexagon with its color.
  * @returns {void}
  */
@@ -408,7 +427,7 @@ function connectControls() {
   element("power-on-button").addEventListener("click", () => sendAction("power", { isOn: true }));
   element("power-off-button").addEventListener("click", () => sendAction("power", { isOn: false }));
   element("white-button").addEventListener("click", sendWhite);
-  element("gradient-button").addEventListener("click", sendGradient);
+  element("gradient-button").addEventListener("click", applyGradient);
   connectPanelControls();
   slider("gradient-start").addEventListener("input", updateGradientPreview);
   slider("gradient-end").addEventListener("input", updateGradientPreview);

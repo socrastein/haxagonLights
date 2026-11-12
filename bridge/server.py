@@ -27,7 +27,6 @@ ACTIONS: dict[str, tuple[Callable[..., bytes], list[str]]] = {
     "power": (protocol.power_frame, ["isOn"]),
     "color": (protocol.color_frame, ["hue", "saturation"]),
     "brightness": (protocol.brightness_frame, ["percent"]),
-    "gradient": (protocol.gradient_frame, ["startColor", "endColor"]),
     "panels": (protocol.panel_colors_frame, ["colors"]),
     "scene": (protocol.scene_frame, ["name"]),
     "scene-speed": (protocol.scene_speed_frame, ["percent"]),
@@ -75,6 +74,16 @@ async def show_status(request: web.Request) -> web.Response:
     """Report whether the lights are currently connected."""
     is_connected = lights.is_lights_connected(request.app.get(LIGHTS_KEY))
     return web.json_response({"isConnected": is_connected})
+
+
+async def show_gradient_colors(request: web.Request) -> web.Response:
+    """Work out a gradient's panel colors without sending them; the page shows, then sends them."""
+    try:
+        body = await read_json_body(request)
+        colors = protocol.gradient_colors(body["startColor"], body["endColor"])
+    except (ValueError, TypeError, KeyError) as error:
+        return json_error(f"bad request: {error}", 400)
+    return web.json_response({"colors": colors})
 
 
 async def connect(request: web.Request) -> web.Response:
@@ -144,6 +153,7 @@ def create_app() -> web.Application:
             web.static("/static", WEB_DIRECTORY),
             web.get("/api/options", show_options),
             web.get("/api/status", show_status),
+            web.post("/api/gradient-colors", show_gradient_colors),
             web.post("/api/connect", connect),
             web.post("/api/disconnect", disconnect),
             web.post("/api/{action}", run_action),

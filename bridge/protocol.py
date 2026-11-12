@@ -209,14 +209,15 @@ def panel_colors_frame(hex_colors: list[str]) -> bytes:
     return per_light_frame([parse_hex_color(color) for color in hex_colors])
 
 
-def gradient_frame(start_color: str, end_color: str) -> bytes:
+def gradient_colors(start_color: str, end_color: str) -> list[str]:
     """Fade along the chain from the start color on panel 1 to the end color on the last panel.
 
-    Colors are hex like "#ff95ff".
+    Colors are hex like "#ff95ff", in and out: the page shows them on its panel map, then sends
+    them with panel_colors_frame like any other panel colors.
     """
     start = parse_hex_color(start_color)
     end = parse_hex_color(end_color)
-    return per_light_frame(blend_colors(start, end, PANEL_COUNT))
+    return [hex_color_of(color) for color in blend_colors(start, end, PANEL_COUNT)]
 
 
 def blend_colors(start: Rgb, end: Rgb, steps: int) -> list[Rgb]:
@@ -252,6 +253,11 @@ def parse_hex_color(hex_color: str) -> Rgb:
         raise ValueError(f"color must look like #rrggbb, not {hex_color!r}")
     channels = bytes.fromhex(hex_color[1:])  # Raises ValueError itself on non-hex digits.
     return channels[0], channels[1], channels[2]
+
+
+def hex_color_of(color: Rgb) -> str:
+    """Write (red, green, blue) as "#rrggbb", the form a browser color picker takes."""
+    return "#" + bytes(color).hex()
 
 
 def color_bytes(color: Rgb) -> bytes:
