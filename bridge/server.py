@@ -7,6 +7,7 @@ control the lights.
 Run with: .venv/bin/python bridge/server.py
 """
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -21,6 +22,7 @@ HOST = "127.0.0.1"
 PORT = 8765
 WEB_DIRECTORY = Path(__file__).resolve().parent.parent / "web"
 LIGHTS_KEY = web.AppKey("lights", lights.LightsConnection)
+CONNECT_LOCK_KEY = web.AppKey("connect lock", asyncio.Lock)
 PRESETS_PATH = presets.default_presets_path()
 
 # Action name -> (frame builder, the JSON fields it takes, in the builder's argument order).
@@ -104,14 +106,19 @@ async def store_preset(request: web.Request) -> web.Response:
 
 
 async def connect(request: web.Request) -> web.Response:
-    """Find and connect to the lights (takes up to the scan time, about 10 seconds)."""
-    if lights.is_lights_connected(request.app.get(LIGHTS_KEY)):
+    """Find and connect to the lights: a second or two, or the full scan time when they are absent.
+
+    Requests take turns, because BlueZ refuses a second scan while one runs (two tabs opening at
+    once used to crash one with a 500). The one that waited then finds the lights connected.
+    """
+    async with request.app[CONNECT_LOCK_KEY]:
+        if lights.is_lights_connected(request.app.get(LIGHTS_KEY)):
+            return web.json_response({"isConnected": True})
+        try:
+            request.app[LIGHTS_KEY] = await lights.connect_to_lights()
+        except lights.LightsNotFoundError as error:
+            return json_error(str(error), 404)
         return web.json_response({"isConnected": True})
-    try:
-        request.app[LIGHTS_KEY] = await lights.connect_to_lights()
-    except lights.LightsNotFoundError as error:
-        return json_error(str(error), 404)
-    return web.json_response({"isConnected": True})
 
 
 async def disconnect(request: web.Request) -> web.Response:
@@ -164,6 +171,7 @@ async def release_lights_on_shutdown(app: web.Application) -> None:
 def create_app() -> web.Application:
     """Assemble the routes: the page, its static files, and the JSON API under /api."""
     app = web.Application(middlewares=[local_requests_only])
+    app[CONNECT_LOCK_KEY] = asyncio.Lock()
     app.add_routes(
         [
             web.get("/", show_page),

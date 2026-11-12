@@ -158,7 +158,7 @@ async function toggleConnection() {
 /**
  * Ask the bridge to find and connect to the lights, then enable the controls.
  *
- * The scan takes up to 10 seconds. It fails when something else, such as a phone app, already
+ * Usually takes a second or two; a scan that finds nothing gives up after 10 seconds. It fails when something else, such as a phone app, already
  * holds the lights, because they accept one connection at a time.
  * @returns {Promise<void>}
  * @throws {Error} With the bridge's message when the lights cannot be found.

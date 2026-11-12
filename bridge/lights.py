@@ -11,6 +11,7 @@ from datetime import datetime
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
 
 import protocol
 
@@ -83,15 +84,27 @@ async def send_frame(connection: LightsConnection, frame: bytes) -> None:
 async def find_lights() -> tuple[bytes, BLEDevice]:
     """Scan until the lights appear; return their advertised identity bytes and the device.
 
-    Raises LightsNotFoundError if they are not advertising. They stop advertising while any
-    other device (the phone app, or a leftover bluetoothctl session) holds a connection.
+    Stops the moment they show up, usually within a second; scanning for the full time first
+    made every connect take over 10 seconds. Raises LightsNotFoundError if they are not
+    advertising. They stop advertising while any other device (the phone app, or a leftover
+    bluetoothctl session) holds a connection.
     """
-    found = await BleakScanner.discover(timeout=SCAN_SECONDS, return_adv=True)
-    for device, advertisement in found.values():
-        if LIGHTS_NAME in (device.name, advertisement.local_name):
-            identity = advertisement.manufacturer_data.get(MANUFACTURER_DATA_KEY, b"")
-            return identity, device
-    raise LightsNotFoundError(f"'{LIGHTS_NAME}' not found in a {SCAN_SECONDS:.0f}s scan")
+    # find_device_by_filter returns only the device, so the filter keeps the advertisement that
+    # matched: the handshake needs its identity bytes.
+    matching_advertisements: list[AdvertisementData] = []
+
+    def is_lights(device: BLEDevice, advertisement: AdvertisementData) -> bool:
+        """Whether this advertisement is the lights' own, remembering it when it is."""
+        is_match = LIGHTS_NAME in (device.name, advertisement.local_name)
+        if is_match:
+            matching_advertisements.append(advertisement)
+        return is_match
+
+    device = await BleakScanner.find_device_by_filter(is_lights, timeout=SCAN_SECONDS)
+    if device is None:
+        raise LightsNotFoundError(f"'{LIGHTS_NAME}' not found in a {SCAN_SECONDS:.0f}s scan")
+    identity = matching_advertisements[-1].manufacturer_data.get(MANUFACTURER_DATA_KEY, b"")
+    return identity, device
 
 
 def log_reply(_characteristic: object, reply: bytearray) -> None:
