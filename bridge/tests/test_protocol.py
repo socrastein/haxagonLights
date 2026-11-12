@@ -179,6 +179,28 @@ class TestPerLightColors:
             protocol.per_light_frame([(256, 0, 0)])
 
 
+class TestPanelColors:
+    """The page's per-panel colors, sent as "#rrggbb" text."""
+
+    def test_matches_the_per_light_frame_for_the_same_colors(self) -> None:
+        expected = protocol.per_light_frame([(255, 0, 0), (255, 255, 0), (0, 0, 255)])
+        assert protocol.panel_colors_frame(["#ff0000", "#ffff00", "#0000ff"]) == expected
+
+    def test_accepts_up_to_the_table_size_of_20(self) -> None:
+        protocol.panel_colors_frame(["#000000"] * 20)
+        with pytest.raises(ValueError):
+            protocol.panel_colors_frame(["#000000"] * 21)
+
+    def test_rejects_a_color_that_is_not_hash_rrggbb(self) -> None:
+        with pytest.raises(ValueError):
+            protocol.panel_colors_frame(["#ff0000", "red"])
+
+    def test_rejects_a_single_color_that_is_not_in_a_list(self) -> None:
+        # A JSON string is iterable, so without this check "#ff0000" would be read as 7 colors.
+        with pytest.raises(ValueError):
+            protocol.panel_colors_frame("#ff0000")  # type: ignore[arg-type]
+
+
 class TestGradient:
     """A fade along the snake from the start color to the end color."""
 

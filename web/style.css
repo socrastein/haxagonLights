@@ -9,6 +9,8 @@
   --accent-text: #ffffff;
   --error: #ff8a8a;
   --border: #3a3a4d;
+  /* A pointed-top hexagon, the shape of one panel. */
+  --hexagon: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
 body {
@@ -125,6 +127,56 @@ input[type="color"] {
   background: var(--background);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
+}
+
+/* The triangle of panels as it hangs on the wall. The bottom row holds 5 panels, so each is a fifth
+   of the width; 5 rows that overlap by a quarter panel make 4 panel heights. A pointed-top
+   hexagon is sqrt(3) wide for every 2 tall, so the ratio is 5 * sqrt(3) / (4 * 2) = 1.0825. */
+#panel-map {
+  position: relative;
+  max-width: 22rem;
+  aspect-ratio: 1.0825;
+  margin: 0 auto;
+}
+
+/* The button is the panel's outline ring; its swatch, inset, shows the panel's color. */
+.panel {
+  position: absolute;
+  width: 20%;
+  height: 25%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--border);
+  clip-path: var(--hexagon);
+  transform: scale(0.94); /* Leaves a gap between panels, like on the wall. */
+}
+
+.panel[aria-pressed="true"] {
+  background: var(--accent);
+}
+
+/* An outline would be clipped away with the corners, so focus shows on the ring instead. */
+.panel:focus-visible {
+  outline: none;
+  background: var(--text);
+}
+
+.panel-swatch {
+  position: absolute;
+  inset: 8%;
+  clip-path: var(--hexagon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  text-shadow: 0 0 3px #000000; /* Keeps the number readable on any panel color. */
+  font-weight: 600;
+}
+
+/* Selection also shows as a check mark, so it does not rely on the ring's color alone. */
+.panel[aria-pressed="true"] .panel-swatch::after {
+  content: "\00a0\2713";
 }
 
 .hint {

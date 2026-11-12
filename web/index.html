@@ -54,6 +54,18 @@
           <button id="gradient-button" type="button">Apply gradient</button>
         </section>
 
+        <section aria-labelledby="panels-heading">
+          <h2 id="panels-heading">Panels</h2>
+          <p class="hint">
+            Select panels, then pick their color. Panel 1 is where the cable enters.
+          </p>
+          <div id="panel-map" role="group" aria-label="Panels, arranged as on the wall"></div>
+          <label for="panel-color">Color of the selected panels</label>
+          <input id="panel-color" type="color" value="#ff95ff" />
+          <button id="select-all-panels-button" type="button">Select all</button>
+          <button id="select-no-panels-button" type="button">Select none</button>
+        </section>
+
         <section aria-labelledby="scenes-heading">
           <h2 id="scenes-heading">Scenes</h2>
           <div id="scene-buttons" class="button-grid"></div>

@@ -5,6 +5,34 @@
 // Fast enough to feel live, slow enough not to flood Bluetooth.
 const SLIDER_SEND_INTERVAL_MILLISECONDS = 100;
 
+// Where each panel hangs in the triangle, panel 1 first, following the cable counterclockwise.
+// Row 0 is the tip and row 4 the bottom; a row has one more slot than the one above it, and the
+// column counts slots from that row's left end.
+const PANEL_POSITIONS = [
+  { row: 1, column: 0 }, // Panel 1, where the cable enters.
+  { row: 2, column: 0 },
+  { row: 3, column: 0 },
+  { row: 4, column: 0 }, // Bottom left corner.
+  { row: 4, column: 1 },
+  { row: 4, column: 2 },
+  { row: 4, column: 3 },
+  { row: 4, column: 4 }, // Bottom right corner.
+  { row: 3, column: 3 },
+  { row: 2, column: 2 },
+  { row: 1, column: 1 },
+  { row: 0, column: 0 }, // Panel 12, the tip.
+];
+const BOTTOM_ROW_PANELS = 5;
+// Panel size as a share of the map (see #panel-map in style.css): each row starts three quarters
+// of a panel below the one above, because pointed-top hexagons nest into each other.
+const PANEL_WIDTH_PERCENT = 100 / BOTTOM_ROW_PANELS;
+const ROW_STEP_PERCENT = 18.75;
+const PANEL_OFF_COLOR = "#000000";
+
+// Each panel's color as "#rrggbb", panel 1 first. The page cannot read the lights' colors, so
+// every panel starts off, and the first pick sends the rest as off too.
+const panelColors = PANEL_POSITIONS.map(() => PANEL_OFF_COLOR);
+
 /**
  * Fetch a bridge endpoint and return its JSON body.
  * @param {string} path - e.g. "/api/status".
@@ -196,6 +224,136 @@ function sendGradient() {
 }
 
 /**
+ * Draw one button per panel, placed as the panels hang on the wall.
+ * @returns {void}
+ */
+function createPanelMap() {
+  const map = element("panel-map");
+  PANEL_POSITIONS.forEach((position, index) => {
+    map.appendChild(createPanelButton(index, position.row, position.column));
+  });
+  showPanelColors();
+}
+
+/**
+ * Make the hexagon button for one panel; pressing it selects or deselects the panel.
+ * @param {number} index - The panel's place in panelColors (panel number minus one).
+ * @param {number} row
+ * @param {number} column
+ * @returns {HTMLButtonElement}
+ */
+function createPanelButton(index, row, column) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "panel";
+  button.setAttribute("aria-label", `Panel ${index + 1}`);
+  button.setAttribute("aria-pressed", "false");
+  button.style.left = `${panelLeftPercent(row, column)}%`;
+  button.style.top = `${row * ROW_STEP_PERCENT}%`;
+  const swatch = document.createElement("span");
+  swatch.className = "panel-swatch";
+  swatch.textContent = String(index + 1);
+  button.appendChild(swatch);
+  button.addEventListener("click", () => togglePanel(button, index));
+  return button;
+}
+
+/**
+ * Where a panel's left edge sits, as a percent of the map's width. Rows are centered over the
+ * bottom row, so each row up starts half a panel further right.
+ * @param {number} row
+ * @param {number} column
+ * @returns {number}
+ */
+function panelLeftPercent(row, column) {
+  const emptySlotsBesideRow = BOTTOM_ROW_PANELS - (row + 1);
+  const rowStartInPanels = emptySlotsBesideRow / 2;
+  return (rowStartInPanels + column) * PANEL_WIDTH_PERCENT;
+}
+
+/**
+ * Select or deselect a panel. Selecting one also loads its color into the picker, so it can be
+ * adjusted from where it is.
+ * @param {HTMLButtonElement} button
+ * @param {number} index
+ * @returns {void}
+ */
+function togglePanel(button, index) {
+  const isSelected = !isPressed(button);
+  button.setAttribute("aria-pressed", String(isSelected));
+  if (isSelected) slider("panel-color").value = panelColors[index];
+}
+
+/**
+ * Select every panel (true) or none (false).
+ * @param {boolean} isSelected
+ * @returns {void}
+ */
+function selectAllPanels(isSelected) {
+  for (const button of panelButtons()) button.setAttribute("aria-pressed", String(isSelected));
+}
+
+/**
+ * The panel buttons, panel 1 first.
+ * @returns {HTMLButtonElement[]}
+ */
+function panelButtons() {
+  return [...element("panel-map").querySelectorAll("button")];
+}
+
+/**
+ * Give every selected panel the picker's color, on the page only (sendPanelColors sends it).
+ * @returns {void}
+ */
+function paintSelectedPanels() {
+  const color = slider("panel-color").value;
+  const selectedIndexes = selectedPanelIndexes();
+  if (selectedIndexes.length === 0) showStatus("Select a panel first, then pick its color", true);
+  for (const index of selectedIndexes) panelColors[index] = color;
+  showPanelColors();
+}
+
+/**
+ * The selected panels' places in panelColors, in panel order.
+ * @returns {number[]}
+ */
+function selectedPanelIndexes() {
+  const indexes = [];
+  for (const [index, button] of panelButtons().entries()) {
+    if (isPressed(button)) indexes.push(index);
+  }
+  return indexes;
+}
+
+/**
+ * Whether a toggle button is pressed (for a panel: selected).
+ * @param {HTMLButtonElement} button
+ * @returns {boolean}
+ */
+function isPressed(button) {
+  return button.getAttribute("aria-pressed") === "true";
+}
+
+/**
+ * Fill each panel's hexagon with its color.
+ * @returns {void}
+ */
+function showPanelColors() {
+  for (const [index, button] of panelButtons().entries()) {
+    const swatch = /** @type {HTMLElement} */ (button.firstElementChild);
+    swatch.style.background = panelColors[index];
+  }
+}
+
+/**
+ * Send every panel's color to the lights.
+ * @returns {void}
+ */
+function sendPanelColors() {
+  sendAction("panels", { colors: panelColors });
+}
+
+/**
  * Show white: zero saturation, with the saturation slider moved to match.
  * @returns {void}
  */
@@ -251,6 +409,7 @@ function connectControls() {
   element("power-off-button").addEventListener("click", () => sendAction("power", { isOn: false }));
   element("white-button").addEventListener("click", sendWhite);
   element("gradient-button").addEventListener("click", sendGradient);
+  connectPanelControls();
   slider("gradient-start").addEventListener("input", updateGradientPreview);
   slider("gradient-end").addEventListener("input", updateGradientPreview);
   const sendColorWhileDragging = throttled(sendColor);
@@ -262,11 +421,26 @@ function connectControls() {
 }
 
 /**
+ * Make the panel color picker and the select buttons do their jobs.
+ * @returns {void}
+ */
+function connectPanelControls() {
+  const sendPanelColorsWhilePicking = throttled(sendPanelColors);
+  slider("panel-color").addEventListener("input", () => {
+    paintSelectedPanels();
+    sendPanelColorsWhilePicking();
+  });
+  element("select-all-panels-button").addEventListener("click", () => selectAllPanels(true));
+  element("select-no-panels-button").addEventListener("click", () => selectAllPanels(false));
+}
+
+/**
  * Wire every control, load the scene and music names, and connect to the lights if needed.
  * @returns {Promise<void>}
  */
 async function start() {
   connectControls();
+  createPanelMap();
   const options = await callBridge("/api/options");
   fillButtons("scene-buttons", options.scenes, "scene");
   fillButtons("music-buttons", options.musicModes, "music-mode");

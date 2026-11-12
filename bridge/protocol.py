@@ -199,6 +199,16 @@ def per_light_frame(panel_colors: list[Rgb]) -> bytes:
     return frame[:-1] + bytes([PER_LIGHT_TRAILER])  # Replace the checksum: see PER_LIGHT_TRAILER.
 
 
+def panel_colors_frame(hex_colors: list[str]) -> bytes:
+    """Color each panel from a list like ["#ff0000", "#00ff00"], panel 1 first.
+
+    This is per_light_frame for the page, which sends what its color pickers give.
+    """
+    if not isinstance(hex_colors, list):
+        raise ValueError("colors must be a list of #rrggbb")
+    return per_light_frame([parse_hex_color(color) for color in hex_colors])
+
+
 def gradient_frame(start_color: str, end_color: str) -> bytes:
     """Fade along the chain from the start color on panel 1 to the end color on the last panel.
 
