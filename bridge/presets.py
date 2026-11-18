@@ -62,8 +62,9 @@ def checked_preset(preset: object) -> Preset:
 def write_presets(path: Path, slots: list[Preset | None]) -> None:
     """Replace the file with these slots.
 
-    Writes a temporary file and renames it over the old one, so a crash mid-write leaves the old
-    presets whole instead of a half-written file.
+    Writes a temporary file and renames it over the old one, so this program crashing mid-write
+    leaves the old presets whole instead of a half-written file. The file is not flushed to disk
+    before the rename, so a power cut can still lose the new presets.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_suffix(".tmp")

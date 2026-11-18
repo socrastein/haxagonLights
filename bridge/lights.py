@@ -58,12 +58,23 @@ async def connect_to_lights() -> LightsConnection:
     advertisement_bytes, device = await find_lights()
     client = BleakClient(device)
     await client.connect()
-    await client.start_notify(REPLY_CHARACTERISTIC_UUID, log_reply)
     connection = LightsConnection(client)
+    try:
+        await greet_lights(connection, advertisement_bytes)
+    except BaseException:
+        # The link is open but the bridge never gets the connection back, so nothing else would
+        # close it. The lights take one client, so close it here, then let the error travel.
+        await client.disconnect()
+        raise
+    return connection
+
+
+async def greet_lights(connection: LightsConnection, advertisement_bytes: bytes) -> None:
+    """Subscribe to replies, then send the app's handshake and clock sync, in the app's order."""
+    await connection.client.start_notify(REPLY_CHARACTERISTIC_UUID, log_reply)
     await send_frame(connection, protocol.handshake_frame(advertisement_bytes))
     await asyncio.sleep(HANDSHAKE_SETTLE_SECONDS)
     await send_frame(connection, protocol.clock_sync_frame(datetime.now()))
-    return connection
 
 
 async def disconnect_from_lights(connection: LightsConnection) -> None:
@@ -102,7 +113,10 @@ async def find_lights() -> tuple[bytes, BLEDevice]:
 
     device = await BleakScanner.find_device_by_filter(is_lights, timeout=SCAN_SECONDS)
     if device is None:
-        raise LightsNotFoundError(f"'{LIGHTS_NAME}' not found in a {SCAN_SECONDS:.0f}s scan")
+        raise LightsNotFoundError(
+            f"'{LIGHTS_NAME}' not found in a {SCAN_SECONDS:.0f}s scan. Turn the lights on, and "
+            "close the phone app and any bluetoothctl session that may hold them."
+        )
     identity = matching_advertisements[-1].manufacturer_data.get(MANUFACTURER_DATA_KEY, b"")
     return identity, device
 
