@@ -40,6 +40,14 @@ Dependencies point one way: `web` calls `server`, `server` calls `lights`, `pres
 - The lights **ignore** a per-light frame unless it has all 20 entries and the leading byte is `01` (`00` and `02` were
   acknowledged but ignored, as were 11- and 12-entry tables). They acknowledge everything, so an ack proves nothing.
 - Brightness (`05`) still works on top of a per-light frame.
+- **A per-light frame sets only hue and saturation per panel** (tested 2026-11-18): a dimmer version of a colour looks
+  identical to the full one, so one panel cannot be dimmer than another; brightness is global. Black (`000000`) does
+  turn a panel off, so a panel can blink, and a saturation change (blue to pale blue) shows.
+- **The lights keep up with about 10 per-light frames a second** (one every 100 ms looked smooth enough; the bridge
+  answers a frame in about 2 ms once connected; connecting takes over a second).
+- **The per-light frame's first byte is not a mode selector:** only `01` is acted on; `00`, `02` (captures) and `03` to
+  `08`, `10`, `ff` (tested 2026-11-18, each after a blank frame) are acknowledged and ignored. The built-in effects
+  (scenes `06`, music modes `07`) apply to the whole display only.
 - LEDs wash out light colors: a pale pink on screen looks nearly white on the panels, so pick the gradient's colors darker.
 
 ## Open questions
